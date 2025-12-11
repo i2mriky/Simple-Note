@@ -3,20 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Smart Notes - HTML نسخة مع زوم</title>
+  <title>Smart Notes - HTML نسخة</title>
   <style>
     :root{
       --bg:#f8fafc; --muted:#64748b; --panel:#ffffffcc;
     }
     html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; background:var(--bg);}
     .app{position:relative;height:100vh;overflow:hidden}
+    /* background grid */
     .grid-bg{position:absolute;inset:0;background-image:radial-gradient(#cbd5e1 2px, transparent 2px);background-size:40px 40px;cursor:grab}
     .controls{position:fixed;top:12px;right:12px;display:flex;flex-direction:column;gap:8px;z-index:60}
     .ctrl-btn{background:white;padding:10px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,0.08);border:none;cursor:pointer}
     .center-add{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:45}
     .add-btn{width:88px;height:88px;border-radius:28px;background:#111827;color:white;border:none;display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 20px 40px rgba(2,6,23,0.3);cursor:pointer}
+    /* canvas area transform */
     .canvas-layer{position:absolute;inset:0;transform-origin:0 0;pointer-events:none}
     .notes-root{position:absolute;left:50%;top:50%;pointer-events:auto}
+    /* note style */
     .note{
       position:absolute;width:200px;height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
       border-radius:40% 60% 70% 30%/40% 50% 60% 50%;box-shadow:0 12px 30px rgba(2,6,23,0.08);overflow:hidden;cursor:grab;
@@ -26,74 +29,611 @@
     .note .text{font-size:13px;color:#444;padding:0 8px;opacity:.85}
     .note .media{margin-top:8px}
     .delete-x{position:absolute;left:8px;top:8px;background:white;border-radius:9px;padding:6px;cursor:pointer;opacity:.95}
+    /* categories */
     .cat-personal{background:#ffcfd2;color:#5c3a3c}
     .cat-work{background:#daeaf6;color:#3b4d61}
     .cat-ideas{background:#fff4bd;color:#6b5d3a}
     .cat-urgent{background:#e2f0cb;color:#4a5e3a}
     .cat-script{background:#e0e7ff;color:#3730a3}
+    /* sidebar */
     .sidebar{position:fixed;top:0;right:0;height:100%;width:320px;background:var(--panel);backdrop-filter:blur(6px);box-shadow:-30px 0 70px rgba(2,6,23,0.06);padding:20px;transform:translateX(100%);transition:transform .28s;z-index:80}
     .sidebar.open{transform:translateX(0)}
+    .sidebar h2{margin:0 0 12px;font-size:18px;display:flex;align-items:center;gap:8px}
+    .sidebar .cat-btn{display:block;width:100%;text-align:right;padding:10px;border-radius:10px;margin-bottom:8px;background:#f3f4f6;border:none;cursor:pointer}
     .status-bar{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#2563eb;color:white;padding:8px 14px;border-radius:999px;z-index:90;display:none}
     .status-bar.show{display:block}
+    /* modal */
     .modal-back{position:fixed;inset:0;background:rgba(255,255,255,0.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:100}
+    .modal{width:100%;max-width:820px;border-radius:18px;background:white;box-shadow:0 30px 60px rgba(2,6,23,.12);overflow:hidden}
+    .modal .header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #f1f5f9}
+    .modal .body{padding:18px;max-height:60vh;overflow:auto}
+    .modal .footer{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-top:1px solid #f1f5f9}
+    input[type="text"], textarea, select{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef7;outline:none;font-size:15px}
+    textarea{min-height:120px;resize:vertical}
+    .cat-list{display:flex;gap:8px;flex-wrap:wrap}
+    .cat-pill{padding:8px 12px;border-radius:999px;background:#f3f4f6;cursor:pointer}
+    .export-btn{background:#059669;color:white;padding:10px 14px;border-radius:10px;border:none;cursor:pointer}
+    .small{font-size:12px;color:#56647a}
+    /* responsive */
+    @media (max-width:720px){
+      .sidebar{width:100%;max-width:none}
+      .add-btn{width:72px;height:72px}
+    }
   </style>
 </head>
 <body>
-<div class="app" id="app">
-<div class="grid-bg" id="bg"></div>
+  <div class="app" id="app">
+    <div class="grid-bg" id="bg" ></div>
 
-<div class="controls">
-  <button class="ctrl-btn" id="menuBtn">☰</button>
-  <button class="ctrl-btn" id="resetView">🎯</button>
-  <button class="ctrl-btn" id="connectToggle">🔗</button>
-  <button class="ctrl-btn" id="exportBtn">📤</button>
-  <button class="ctrl-btn" id="zoomIn">＋</button>
-  <button class="ctrl-btn" id="zoomOut">－</button>
-</div>
+    <div class="controls">
+      <button class="ctrl-btn" id="menuBtn">☰</button>
+      <button class="ctrl-btn" id="resetView">🎯</button>
+      <button class="ctrl-btn" id="connectToggle">🔗</button>
+      <button class="ctrl-btn" id="exportBtn">📤</button>
+    </div>
 
-<div class="status-bar" id="status">اضغط على الملاحظة الأولى</div>
+    <div class="status-bar" id="status">اضغط على الملاحظة الأولى</div>
 
-<div class="center-add">
-  <button class="add-btn" id="openAdd">＋</button>
-</div>
+    <div class="center-add">
+      <button class="add-btn" id="openAdd">＋</button>
+    </div>
 
-<svg id="svgLayer" style="position:absolute;inset:0;z-index:30;pointer-events:none"></svg>
+    <!-- SVG layer for connections -->
+    <svg id="svgLayer" style="position:absolute;inset:0;z-index:30;pointer-events:none"></svg>
 
-<div class="canvas-layer" id="canvasLayer" style="transform:translate(0px,0px) scale(1)">
-  <div class="notes-root" id="notesRoot"></div>
-</div>
+    <!-- canvas transform layer -->
+    <div class="canvas-layer" id="canvasLayer" style="transform:translate(0px,0px) scale(1)">
+      <div class="notes-root" id="notesRoot" style="left:50%;top:50%"></div>
+    </div>
 
-<aside class="sidebar" id="sidebar"></aside>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2>الأقسام</h2>
+        <button id="closeSidebar" class="ctrl-btn" style="padding:6px">✕</button>
+      </div>
+      <div style="margin-top:12px">
+        <button class="cat-btn" data-id="all">الكل</button>
+        <button class="cat-btn" data-id="personal">شخصي</button>
+        <button class="cat-btn" data-id="work">شغل</button>
+        <button class="cat-btn" data-id="ideas">أفكار</button>
+        <button class="cat-btn" data-id="urgent">مهم</button>
+        <button class="cat-btn" data-id="script">سكربت</button>
+      </div>
+      <div style="margin-top:18px;font-size:13px;color:#475569">Smart Notes - HTML v1</div>
+      <div style="margin-top:12px;font-size:12px;color:#94a3b8">انقر على زر + لإضافة ملاحظة. اسحب الملاحظة لتحريكها. اضغط زر الربط ثم اختر ملاحظتين لعمل رابط.</div>
+    </aside>
 
-<div id="modalWrap" style="display:none"></div>
-</div>
+    <!-- Modal -->
+    <div id="modalWrap" style="display:none"></div>
+  </div>
 
-<script>
-let viewOffset={x:0,y:0}, scale=1;
-const canvasLayer=document.getElementById("canvasLayer");
-const svgLayer=document.getElementById("svgLayer");
+  <script>
+  (function(){
+    // Helper
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
 
-function applyTransform(){
-  canvasLayer.style.transform = \`translate(\${viewOffset.x}px, \${viewOffset.y}px) scale(\${scale})\`;
-}
+    // State
+    let notes = JSON.parse(localStorage.getItem('myBlobNotesV3') || '[]');
+    let connections = JSON.parse(localStorage.getItem('myBlobConnections') || '[]');
+    const categories = [
+      {id:'personal', name:'شخصي', cls:'cat-personal'},
+      {id:'work', name:'شغل', cls:'cat-work'},
+      {id:'ideas', name:'أفكار', cls:'cat-ideas'},
+      {id:'urgent', name:'مهم', cls:'cat-urgent'},
+      {id:'script', name:'سكربت', cls:'cat-script'}
+    ];
 
-document.getElementById("zoomIn").addEventListener("click", ()=>{
-  scale += 0.1; if(scale>2) scale=2;
-  applyTransform();
-});
-document.getElementById("zoomOut").addEventListener("click", ()=>{
-  scale -= 0.1; if(scale<0.3) scale=0.3;
-  applyTransform();
-});
+    // View transform
+    let viewOffset = {x:0,y:0}, scale=1;
+    const canvasLayer = $('#canvasLayer');
+    const notesRoot = $('#notesRoot');
+    const svgLayer = $('#svgLayer');
 
-window.addEventListener("wheel",(e)=>{
-  const delta=e.deltaY>0?-0.05:+0.05;
-  scale+=delta;
-  if(scale<0.3) scale=0.3;
-  if(scale>2) scale=2;
-  applyTransform();
-},{passive:true});
-</script>
+    // Dragging
+    let drag = {isDragging:false, type:null, id:null, startX:0, startY:0, initialX:0, initialY:0, initialOffsetX:0, initialOffsetY:0};
+    let connectingMode = false, connectingSource = null;
+    let currentFilter = 'all';
 
+    // DOM refs
+    const statusBar = $('#status');
+    const sidebar = $('#sidebar');
+    const modalWrap = $('#modalWrap');
+
+    // Save to localStorage
+    function persist(){
+      try{
+        localStorage.setItem('myBlobNotesV3', JSON.stringify(notes));
+        localStorage.setItem('myBlobConnections', JSON.stringify(connections));
+      }catch(e){ console.warn('storage error', e); alert('تحذير: قد تكون سعة التخزين ممتلئة');}
+    }
+
+    // Util: create id
+    const uid = ()=> Date.now() + Math.floor(Math.random()*999);
+
+    // Render notes
+    function renderNotes(){
+      notesRoot.innerHTML = '';
+      // filter notes by parentId === null (flat) and by category
+      const shown = notes.filter(n => (n.parentId === null || n.parentId === undefined) && (currentFilter==='all' || n.categoryId===currentFilter));
+      shown.forEach(n => {
+        const el = document.createElement('div');
+        el.className = 'note ' + (categories.find(c=>c.id===n.categoryId)?.cls || '');
+        el.style.left = (n.x || 0) + 'px';
+        el.style.top = (n.y || 0) + 'px';
+        el.style.transform = `translate(${n.x}px, ${n.y}px) rotate(${n.rotation||0}deg)`;
+        el.style.width = n.type==='group'?'260px':'200px';
+        el.style.height = n.type==='group'?'260px':'200px';
+        el.dataset.id = n.id;
+        el.innerHTML = `
+           <div class="delete-x" data-id="${n.id}">🗑</div>
+           <div class="content">
+             ${n.type==='group'?'<div style="font-size:28px;opacity:.5">📁</div>':''}
+             ${n.image?`<div class="media"><img src="${n.image}" style="width:64px;height:64px;border-radius:10px;object-fit:cover;border:2px solid rgba(255,255,255,.6)"></div>`:''}
+             <div class="title">${escapeHtml(n.title||'بدون عنوان')}</div>
+             ${n.type!=='group' && n.content?`<div class="text">${escapeHtml(n.content)}</div>`:''}
+             ${n.audio?`<div style="margin-top:8px;"><audio src="${n.audio}" controls style="width:140px"></audio></div>`:''}
+           </div>`;
+        // attach listeners
+        el.addEventListener('pointerdown', (e)=> onNotePointerDown(e, n.id));
+        el.addEventListener('dblclick', (e)=> { e.stopPropagation(); openEditModal(n); });
+        const del = el.querySelector('.delete-x');
+        del.addEventListener('click', (ev)=> { ev.stopPropagation(); deleteNote(n.id); });
+        notesRoot.appendChild(el);
+      });
+      renderConnections();
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+    }
+
+    // Render SVG connections
+    function renderConnections(){
+      svgLayer.innerHTML = '';
+      connections.forEach(conn=>{
+        const from = notes.find(n=>n.id===conn.from);
+        const to = notes.find(n=>n.id===conn.to);
+        if(!from || !to) return;
+        // Only show if both are visible in current filter and top-level
+        if ((currentFilter!=='all' && (from.categoryId!==currentFilter || to.categoryId!==currentFilter))) return;
+        // line coordinates relative to center (notesRoot left:50% top:50% meaning origin at center)
+        const x1 = from.x || 0, y1 = from.y || 0, x2 = to.x || 0, y2 = to.y || 0;
+        const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1', x1 + window.innerWidth/2);
+        line.setAttribute('y1', y1 + window.innerHeight/2);
+        line.setAttribute('x2', x2 + window.innerWidth/2);
+        line.setAttribute('y2', y2 + window.innerHeight/2);
+        line.setAttribute('stroke', '#94a3b8');
+        line.setAttribute('stroke-width', 3);
+        line.setAttribute('stroke-dasharray','6,5');
+        svgLayer.appendChild(line);
+        // midpoint button to delete
+        const cx = (x1+x2)/2 + window.innerWidth/2;
+        const cy = (y1+y2)/2 + window.innerHeight/2;
+        const circ = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        circ.setAttribute('cx', cx);
+        circ.setAttribute('cy', cy);
+        circ.setAttribute('r', 6);
+        circ.setAttribute('fill', '#64748b');
+        circ.style.cursor = 'pointer';
+        circ.addEventListener('click', ()=> { if(confirm('حذف الربط؟')){ connections = connections.filter(c=>c.id!==conn.id); persist(); renderConnections(); }});
+        svgLayer.appendChild(circ);
+      });
+    }
+
+    // Pointer events: support touch and mouse
+    function onBgPointerDown(e){
+      startDrag(e.clientX, e.clientY, 'canvas');
+    }
+    function onBgPointerMove(e){
+      if(drag.isDragging && drag.type==='canvas'){
+        handleMove(e.clientX, e.clientY);
+      }
+    }
+    function onBgPointerUp(e){
+      endDrag();
+    }
+
+    function onNotePointerDown(e, id){
+      e.preventDefault(); e.stopPropagation();
+      if(connectingMode){
+        handleConnectionClick(id);
+        return;
+      }
+      startDrag(e.clientX, e.clientY, 'note', id);
+    }
+
+    function startDrag(clientX, clientY, type, id=null){
+      drag.isDragging = true;
+      drag.type = type;
+      drag.id = id;
+      drag.startX = clientX;
+      drag.startY = clientY;
+      drag.initialX = clientX;
+      drag.initialY = clientY;
+      drag.initialOffsetX = viewOffset.x;
+      drag.initialOffsetY = viewOffset.y;
+      // add global listeners
+      window.addEventListener('pointermove', globalPointerMove);
+      window.addEventListener('pointerup', globalPointerUp);
+    }
+
+    function globalPointerMove(e){
+      if(!drag.isDragging) return;
+      if(drag.type==='canvas'){
+        handleMove(e.clientX, e.clientY);
+      } else if(drag.type==='note'){
+        handleNoteDrag(e.clientX, e.clientY);
+      }
+    }
+    function globalPointerUp(e){
+      endDrag();
+    }
+
+    function handleMove(clientX, clientY){
+      const dx = clientX - drag.startX;
+      const dy = clientY - drag.startY;
+      // pan
+      viewOffset.x = drag.initialOffsetX + dx;
+      viewOffset.y = drag.initialOffsetY + dy;
+      canvasLayer.style.transform = `translate(${viewOffset.x}px, ${viewOffset.y}px) scale(${scale})`;
+      // keep svg in sync
+      renderConnections();
+    }
+
+    function handleNoteDrag(clientX, clientY){
+      const dx = clientX - drag.startX;
+      const dy = clientY - drag.startY;
+      // update note position incrementally
+      const note = notes.find(n=>n.id===drag.id);
+      if(!note) return;
+      note.x = (note.x||0) + dx;
+      note.y = (note.y||0) + dy;
+      drag.startX = clientX;
+      drag.startY = clientY;
+      persist();
+      renderNotes();
+    }
+
+    function endDrag(){
+      if(!drag.isDragging) return;
+      // detect click vs drag
+      const dist = Math.hypot(drag.startX - drag.initialX, drag.startY - drag.initialY);
+      if(dist < 6 && drag.type==='note'){
+        // click (open edit)
+        const note = notes.find(n=>n.id===drag.id);
+        if(note) openEditModal(note);
+      }
+      drag = {isDragging:false,type:null,id:null,startX:0,startY:0,initialX:0,initialY:0,initialOffsetX:0,initialOffsetY:0};
+      window.removeEventListener('pointermove', globalPointerMove);
+      window.removeEventListener('pointerup', globalPointerUp);
+    }
+
+    // Add / Edit Modal
+    function openAddModal(){
+      openModal();
+    }
+    function openEditModal(note){
+      openModal(note);
+    }
+
+    function openModal(note = null){
+      modalWrap.innerHTML = '';
+      const wrapper = document.createElement('div');
+      wrapper.className = 'modal-back';
+      wrapper.innerHTML = `
+        <div class="modal" role="dialog">
+          <div class="header">
+            <div>
+              <button id="typeNote" class="ctrl-btn" style="margin-left:6px">ملاحظة</button>
+              <button id="typeGroup" class="ctrl-btn">مجلد</button>
+            </div>
+            <div>
+              <button id="closeModal" class="ctrl-btn">✕</button>
+            </div>
+          </div>
+          <div class="body">
+            <input id="noteTitle" placeholder="عنوان الفكرة..." type="text" />
+            <div style="height:12px"></div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <label style="cursor:pointer;padding:8px;background:#f3f4f6;border-radius:8px">
+                رفع صورة
+                <input id="imgInput" type="file" accept="image/*" style="display:none"/>
+              </label>
+              <button id="recBtn" class="ctrl-btn">🎤 تسجيل</button>
+              <div id="mediaPreview" style="display:flex;gap:8px;align-items:center"></div>
+            </div>
+            <div style="height:12px"></div>
+            <textarea id="noteContent" placeholder="اكتب التفاصيل..."></textarea>
+            <div style="height:12px"></div>
+            <div class="cat-list" id="catList"></div>
+          </div>
+          <div class="footer">
+            <div class="small">محتوى سيحفظ محلياً</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="saveBtn" class="export-btn">حفظ</button>
+            </div>
+          </div>
+        </div>
+      `;
+      modalWrap.appendChild(wrapper);
+      modalWrap.style.display = 'block';
+
+      // populate categories
+      const catList = wrapper.querySelector('#catList');
+      categories.forEach(c=>{
+        const btn = document.createElement('div');
+        btn.className = 'cat-pill';
+        btn.textContent = c.name;
+        btn.dataset.id = c.id;
+        btn.addEventListener('click', ()=> {
+          wrapper.querySelectorAll('.cat-pill').forEach(x=>x.style.border='');
+          btn.style.border = '2px solid #e2e8f0';
+          btn.dataset.selected = '1';
+        });
+        catList.appendChild(btn);
+      });
+
+      // set initial values if editing
+      const titleInp = wrapper.querySelector('#noteTitle');
+      const contentTA = wrapper.querySelector('#noteContent');
+      const imgInput = wrapper.querySelector('#imgInput');
+      const recBtn = wrapper.querySelector('#recBtn');
+      const mediaPreview = wrapper.querySelector('#mediaPreview');
+
+      let currentImage = null, currentAudio = null, currentType = 'note', isRecording=false, mediaRecorder=null, audioChunks=[];
+
+      function fillFrom(note){
+        titleInp.value = note.title || '';
+        contentTA.value = note.content || '';
+        currentType = note.type || 'note';
+        if(currentType==='group'){
+          wrapper.querySelector('#typeGroup').classList.add('active');
+        }
+        if(note.image){ currentImage = note.image; showImagePreview(note.image); }
+        if(note.audio){ currentAudio = note.audio; showAudioPreview(note.audio); }
+        // select category
+        const pill = Array.from(wrapper.querySelectorAll('.cat-pill')).find(p=>p.dataset.id===note.categoryId);
+        if(pill){ pill.style.border='2px solid #e2e8f0'; pill.dataset.selected='1'; }
+      }
+
+      function showImagePreview(data){
+        mediaPreview.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = data; img.style.width='64px';img.style.height='64px';img.style.borderRadius='8px';img.style.objectFit='cover';
+        const rm = document.createElement('button'); rm.className='ctrl-btn'; rm.textContent='✕';
+        rm.addEventListener('click', ()=> { currentImage=null; mediaPreview.innerHTML=''; });
+        mediaPreview.appendChild(img); mediaPreview.appendChild(rm);
+      }
+      function showAudioPreview(data){
+        const audio = document.createElement('audio'); audio.src=data; audio.controls=true; audio.style.width='160px';
+        const rm = document.createElement('button'); rm.className='ctrl-btn'; rm.textContent='✕';
+        rm.addEventListener('click', ()=> { currentAudio=null; mediaPreview.innerHTML=''; if(currentImage) showImagePreview(currentImage); });
+        mediaPreview.appendChild(audio); mediaPreview.appendChild(rm);
+      }
+
+      if(note) fillFrom(note);
+
+      // image upload
+      imgInput.addEventListener('change', (ev)=>{
+        const f = ev.target.files[0];
+        if(!f) return;
+        if(f.size>500000){ alert('الصورة كبيرة جداً، اختر صورة أصغر'); return; }
+        const r = new FileReader();
+        r.onloadend = ()=>{ currentImage = r.result; showImagePreview(r.result); };
+        r.readAsDataURL(f);
+      });
+
+      // recording
+      recBtn.addEventListener('click', async ()=>{
+        if(isRecording){
+          mediaRecorder.stop();
+          recBtn.textContent = '🎤 تسجيل';
+          isRecording=false;
+        } else {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            mediaRecorder.ondataavailable = (ev)=>{ if(ev.data.size) audioChunks.push(ev.data); };
+            mediaRecorder.onstop = ()=> {
+              const blob = new Blob(audioChunks, {type:'audio/webm'});
+              const r = new FileReader();
+              r.onloadend = ()=>{ currentAudio = r.result; mediaPreview.innerHTML=''; if(currentImage) showImagePreview(currentImage); showAudioPreview(currentAudio); };
+              r.readAsDataURL(blob);
+              stream.getTracks().forEach(t=>t.stop());
+            };
+            mediaRecorder.start();
+            recBtn.textContent='⏹ إيقاف';
+            isRecording=true;
+          } catch(err){
+            alert('لا يمكن الوصول للميكروفون');
+          }
+        }
+      });
+
+      // type buttons
+      wrapper.querySelector('#typeNote').addEventListener('click', ()=> { currentType='note'; });
+      wrapper.querySelector('#typeGroup').addEventListener('click', ()=> { currentType='group'; });
+
+      // save
+      wrapper.querySelector('#saveBtn').addEventListener('click', ()=>{
+        const title = titleInp.value.trim();
+        const content = contentTA.value.trim();
+        const selected = Array.from(wrapper.querySelectorAll('.cat-pill')).find(p=>p.dataset.selected==='1');
+        const cat = selected ? selected.dataset.id : 'ideas';
+        if(!title && !content && !currentImage && !currentAudio) return alert('اكتب شيئاً او ارفق وسائط');
+        if(note){
+          // update
+          note.title = title; note.content = content; note.categoryId = cat; note.image = currentImage; note.audio = currentAudio; note.type = currentType;
+        } else {
+          // new
+          const angle = Math.random()*Math.PI*2;
+          const radius = 200 + Math.random()*140;
+          notes.unshift({
+            id: uid(),
+            title, content, categoryId:cat, image:currentImage, audio:currentAudio, type:currentType,
+            x: Math.cos(angle)*radius, y: Math.sin(angle)*radius, rotation: (Math.random()*6)-3, parentId:null, date: new Date().toLocaleDateString('ar-EG')
+          });
+        }
+        persist();
+        renderNotes();
+        closeModal();
+      });
+
+      wrapper.querySelector('#closeModal').addEventListener('click', closeModal);
+      wrapper.addEventListener('click', (ev)=>{ if(ev.target===wrapper) closeModal(); });
+
+      function closeModal(){
+        modalWrap.style.display='none';
+        modalWrap.innerHTML = '';
+      }
+    }
+
+    function closeModal(){ modalWrap.style.display='none'; modalWrap.innerHTML=''; }
+
+    // delete note
+    function deleteNote(id){
+      if(!confirm('حذف؟')) return;
+      notes = notes.filter(n=>n.id!==id && n.parentId !== id);
+      connections = connections.filter(c=>c.from!==id && c.to!==id);
+      persist(); renderNotes();
+    }
+
+    // connection handling
+    function handleConnectionClick(noteId){
+      if(!connectingSource){
+        connectingSource = noteId;
+        statusBar.textContent = 'اضغط الملاحظة الثانية للربط';
+        statusBar.classList.add('show');
+      } else {
+        if(connectingSource !== noteId){
+          connections.push({id:uid(), from:connectingSource, to:noteId});
+        }
+        connectingSource = null;
+        connectingMode = false;
+        statusBar.classList.remove('show');
+        persist(); renderConnections();
+      }
+    }
+
+    // UI Buttons
+    $('#menuBtn').addEventListener('click', ()=> sidebar.classList.add('open'));
+    $('#closeSidebar').addEventListener('click', ()=> sidebar.classList.remove('open'));
+    $('#openAdd').addEventListener('click', ()=> openAddModal());
+    $('#resetView').addEventListener('click', ()=> { viewOffset={x:0,y:0}; canvasLayer.style.transform=`translate(0px,0px) scale(${scale})`; renderConnections(); });
+    $('#connectToggle').addEventListener('click', ()=> { connectingMode = !connectingMode; connectingSource = null; statusBar.textContent = 'اضغط على الملاحظة الأولى'; if(connectingMode) statusBar.classList.add('show'); else statusBar.classList.remove('show'); });
+    $('#exportBtn').addEventListener('click', exportCanvas);
+
+    // sidebar category filtering
+    $$('#sidebar .cat-btn').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        const id = b.dataset.id;
+        currentFilter = id;
+        sidebar.classList.remove('open');
+        renderNotes();
+      });
+    });
+
+    // Background pointer for panning
+    const bg = $('#bg');
+    bg.addEventListener('pointerdown', onBgPointerDown);
+    // note: global pointermove/up handled during drag start via window events
+
+    // Double-tap on background to add
+    let lastTap=0;
+    bg.addEventListener('pointerup', ()=>{
+      const t = Date.now();
+      if(t-lastTap < 300){
+        openAddModal();
+      }
+      lastTap = t;
+    });
+
+    // connectionMode visual
+    function updateStatusPulse(){
+      if(connectingMode) statusBar.classList.add('show'); else if(!connectingMode && !connectingSource) statusBar.classList.remove('show');
+    }
+
+    // Export canvas to PNG (approximate)
+    function exportCanvas(){
+      // compute bounds
+      if(notes.length===0){ alert('لا توجد ملاحظات للتصدير'); return; }
+      const allX = notes.map(n=>n.x||0);
+      const allY = notes.map(n=>n.y||0);
+      const minX = Math.min(...allX) - 240;
+      const maxX = Math.max(...allX) + 240;
+      const minY = Math.min(...allY) - 240;
+      const maxY = Math.max(...allY) + 240;
+      const width = Math.max(800, Math.ceil(maxX-minX));
+      const height = Math.max(600, Math.ceil(maxY-minY));
+      const c = document.createElement('canvas');
+      c.width = width; c.height = height;
+      const ctx = c.getContext('2d');
+      // background
+      ctx.fillStyle = '#f8fafc'; ctx.fillRect(0,0,width,height);
+      // grid dots
+      ctx.fillStyle = '#cbd5e1';
+      for(let i=0;i<width;i+=40) for(let j=0;j<height;j+=40){ ctx.beginPath(); ctx.arc(i,j,1,0,Math.PI*2); ctx.fill(); }
+      // connections
+      ctx.strokeStyle = '#94a3b8'; ctx.lineWidth=2;
+      connections.forEach(conn=>{
+        const from = notes.find(n=>n.id===conn.from);
+        const to = notes.find(n=>n.id===conn.to);
+        if(!from||!to) return;
+        ctx.beginPath();
+        ctx.moveTo(from.x - minX + width/2 - (window.innerWidth/2), from.y - minY + height/2 - (window.innerHeight/2));
+        ctx.lineTo(to.x - minX + width/2 - (window.innerWidth/2), to.y - minY + height/2 - (window.innerHeight/2));
+        ctx.stroke();
+      });
+      // notes
+      notes.forEach(n=>{
+        const x = n.x - minX + width/2 - (window.innerWidth/2);
+        const y = n.y - minY + height/2 - (window.innerHeight/2);
+        const size = n.type==='group'?260:200;
+        ctx.save(); ctx.translate(x,y); ctx.rotate((n.rotation||0)*Math.PI/180);
+        // bubble
+        const bgCol = n.categoryId==='personal'?'#ffcfd2':n.categoryId==='work'?'#daeaf6':n.categoryId==='ideas'?'#fff4bd':n.categoryId==='urgent'?'#e2f0cb':'#e0e7ff';
+        ctx.fillStyle = bgCol; ctx.beginPath(); ctx.arc(0,0,size/2 - 10,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.stroke();
+        // title
+        ctx.fillStyle='#222'; ctx.font='bold 20px Arial'; ctx.textAlign='center';
+        ctx.fillText((n.title||'بدون عنوان').substring(0,20),0,-10);
+        if(n.type!=='group'){ ctx.font='14px Arial'; ctx.fillStyle='#555'; ctx.fillText(((n.content||'').substring(0,25)) + (n.content && n.content.length>25?'...':''),0,20); } else { ctx.font='14px Arial'; ctx.fillStyle='#555'; ctx.fillText('📁 مجلد',0,20); }
+        ctx.restore();
+      });
+      // download
+      const link = document.createElement('a');
+      link.download = `my-mindmap-${Date.now()}.png`;
+      link.href = c.toDataURL();
+      link.click();
+    }
+
+    // connection button handling: we toggle connectingMode externally but visually set status on next render
+    $('#connectToggle').addEventListener('click', ()=> {
+      connectingMode = !connectingMode;
+      connectingSource = null;
+      statusBar.textContent = connectingMode? 'اضغط على الملاحظة الأولى' : '';
+      statusBar.classList.toggle('show', connectingMode);
+    });
+
+    // helper: openAddModal wrapper for earlier function name
+    function openAddModal(){ openModal(); }
+
+    // initial render
+    renderNotes();
+
+    // make svg responsive on resize / pan
+    window.addEventListener('resize', renderConnections);
+    // persist periodically
+    window.addEventListener('beforeunload', persist);
+
+    // expose some debug to global for convenience
+    window.__SN = {notes, connections, persist, renderNotes};
+
+  })();
+  </script>
 </body>
 </html>

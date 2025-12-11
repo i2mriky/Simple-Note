@@ -1,432 +1,99 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تطبيق أفكار الفقاعات</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <script src="https://unpkg.com/lucide@latest"></script>
-
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
-
-        body {
-            font-family: 'Tajawal', sans-serif;
-            overflow: hidden; /* لمنع التمرير */
-            user-select: none; /* لمنع تحديد النص أثناء السحب */
-        }
-
-        /* أنيميشن النبض البطيء */
-        @keyframes pulse-slow {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-        .animate-pulse-slow {
-            animation: pulse-slow 3s infinite ease-in-out;
-        }
-
-        /* إخفاء شريط التمرير */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
-        /* تنسيقات إضافية للنافذة المنبثقة */
-        .modal-enter {
-            opacity: 0;
-            transform: scale(0.95);
-        }
-        .modal-enter-active {
-            opacity: 1;
-            transform: scale(1);
-            transition: opacity 200ms ease-out, transform 200ms ease-out;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Smart Notes - HTML نسخة مع زوم</title>
+  <style>
+    :root{
+      --bg:#f8fafc; --muted:#64748b; --panel:#ffffffcc;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; background:var(--bg);}
+    .app{position:relative;height:100vh;overflow:hidden}
+    .grid-bg{position:absolute;inset:0;background-image:radial-gradient(#cbd5e1 2px, transparent 2px);background-size:40px 40px;cursor:grab}
+    .controls{position:fixed;top:12px;right:12px;display:flex;flex-direction:column;gap:8px;z-index:60}
+    .ctrl-btn{background:white;padding:10px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,0.08);border:none;cursor:pointer}
+    .center-add{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:45}
+    .add-btn{width:88px;height:88px;border-radius:28px;background:#111827;color:white;border:none;display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 20px 40px rgba(2,6,23,0.3);cursor:pointer}
+    .canvas-layer{position:absolute;inset:0;transform-origin:0 0;pointer-events:none}
+    .notes-root{position:absolute;left:50%;top:50%;pointer-events:auto}
+    .note{
+      position:absolute;width:200px;height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+      border-radius:40% 60% 70% 30%/40% 50% 60% 50%;box-shadow:0 12px 30px rgba(2,6,23,0.08);overflow:hidden;cursor:grab;
+      user-select:none; touch-action:none;
+    }
+    .note .title{font-weight:800;padding:6px 8px;line-height:1.1}
+    .note .text{font-size:13px;color:#444;padding:0 8px;opacity:.85}
+    .note .media{margin-top:8px}
+    .delete-x{position:absolute;left:8px;top:8px;background:white;border-radius:9px;padding:6px;cursor:pointer;opacity:.95}
+    .cat-personal{background:#ffcfd2;color:#5c3a3c}
+    .cat-work{background:#daeaf6;color:#3b4d61}
+    .cat-ideas{background:#fff4bd;color:#6b5d3a}
+    .cat-urgent{background:#e2f0cb;color:#4a5e3a}
+    .cat-script{background:#e0e7ff;color:#3730a3}
+    .sidebar{position:fixed;top:0;right:0;height:100%;width:320px;background:var(--panel);backdrop-filter:blur(6px);box-shadow:-30px 0 70px rgba(2,6,23,0.06);padding:20px;transform:translateX(100%);transition:transform .28s;z-index:80}
+    .sidebar.open{transform:translateX(0)}
+    .status-bar{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#2563eb;color:white;padding:8px 14px;border-radius:999px;z-index:90;display:none}
+    .status-bar.show{display:block}
+    .modal-back{position:fixed;inset:0;background:rgba(255,255,255,0.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:100}
+  </style>
 </head>
-<body class="bg-[#f8fafc] text-gray-800 h-screen w-full relative selection:bg-pink-200">
+<body>
+<div class="app" id="app">
+<div class="grid-bg" id="bg"></div>
 
-    <div class="absolute inset-0 z-0 opacity-40 pointer-events-none"
-         style="background-image: radial-gradient(#cbd5e1 2px, transparent 2px); background-size: 30px 30px;">
-    </div>
+<div class="controls">
+  <button class="ctrl-btn" id="menuBtn">☰</button>
+  <button class="ctrl-btn" id="resetView">🎯</button>
+  <button class="ctrl-btn" id="connectToggle">🔗</button>
+  <button class="ctrl-btn" id="exportBtn">📤</button>
+  <button class="ctrl-btn" id="zoomIn">＋</button>
+  <button class="ctrl-btn" id="zoomOut">－</button>
+</div>
 
-    <button id="menuBtn" class="fixed top-6 right-6 z-40 bg-white p-3 rounded-full shadow-md hover:shadow-lg transition-all text-gray-600 hover:text-blue-600">
-        <i data-lucide="menu" class="w-6 h-6"></i>
-    </button>
+<div class="status-bar" id="status">اضغط على الملاحظة الأولى</div>
 
-    <div id="sidebar" class="fixed top-0 right-0 h-full w-72 bg-white/90 backdrop-blur-md shadow-2xl z-50 transition-transform duration-300 translate-x-full">
-        <div class="p-6 h-full flex flex-col">
-            <div class="flex justify-between items-center mb-8">
-                <h2 class="text-2xl font-bold flex items-center gap-2 text-gray-700">
-                    <i data-lucide="palette" class="w-6 h-6"></i> الأقسام
-                </h2>
-                <button id="closeMenuBtn"><i data-lucide="x" class="w-6 h-6"></i></button>
-            </div>
-            <div id="sidebarFilters" class="space-y-3">
-                </div>
-        </div>
-    </div>
+<div class="center-add">
+  <button class="add-btn" id="openAdd">＋</button>
+</div>
 
-    <div class="fixed inset-0 pointer-events-none flex items-center justify-center z-30">
-        <button id="addNoteMainBtn" class="pointer-events-auto group relative w-24 h-24 md:w-32 md:h-32 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 focus:outline-none">
-            <div class="absolute inset-0 bg-gray-900 rounded-[40%_60%_70%_30%/40%_50%_60%_50%] animate-pulse-slow shadow-2xl opacity-90 group-hover:bg-black transition-colors"></div>
-            <i data-lucide="plus" class="text-white relative z-10 w-10 h-10 md:w-16 md:h-16" stroke-width="2.5"></i>
-        </button>
-    </div>
+<svg id="svgLayer" style="position:absolute;inset:0;z-index:30;pointer-events:none"></svg>
 
-    <div id="canvasArea" class="absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing">
-        <div id="notesContainer" class="absolute top-1/2 left-1/2 w-0 h-0">
-            </div>
-    </div>
+<div class="canvas-layer" id="canvasLayer" style="transform:translate(0px,0px) scale(1)">
+  <div class="notes-root" id="notesRoot"></div>
+</div>
 
-    <div id="addModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-white/70 backdrop-blur-md">
-        <div class="bg-white w-full max-w-4xl h-[85vh] rounded-[2.5rem] shadow-2xl border border-gray-100 flex flex-col overflow-hidden relative modal-enter-active">
-            
-            <div class="flex justify-between items-center p-6 border-b border-gray-100">
-                <h3 class="text-2xl font-bold text-gray-800">تدوين فكرة جديدة</h3>
-                <button id="closeModalBtn" class="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <i data-lucide="x" class="w-7 h-7 text-gray-500"></i>
-                </button>
-            </div>
+<aside class="sidebar" id="sidebar"></aside>
 
-            <div class="flex-1 p-6 bg-gray-50/50">
-                <textarea id="noteInput"
-                    placeholder="اكتب هنا كل ما يدور في ذهنك... (سيناريو، أفكار، خطط)"
-                    class="w-full h-full bg-transparent border-none focus:ring-0 text-xl md:text-2xl leading-relaxed text-gray-700 placeholder-gray-300 resize-none p-2 font-medium outline-none"
-                ></textarea>
-            </div>
+<div id="modalWrap" style="display:none"></div>
+</div>
 
-            <div class="p-6 bg-white border-t border-gray-100">
-                <div class="flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div id="categorySelector" class="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 no-scrollbar">
-                        </div>
+<script>
+let viewOffset={x:0,y:0}, scale=1;
+const canvasLayer=document.getElementById("canvasLayer");
+const svgLayer=document.getElementById("svgLayer");
 
-                    <button id="saveNoteBtn" class="w-full md:w-auto px-10 py-4 bg-gray-900 hover:bg-black text-white rounded-2xl font-bold text-lg transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 min-w-[200px]">
-                        <i data-lucide="plus" class="w-5 h-5"></i>
-                        إضافة للوحة
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+function applyTransform(){
+  canvasLayer.style.transform = \`translate(\${viewOffset.x}px, \${viewOffset.y}px) scale(\${scale})\`;
+}
 
-    <script>
-        // --- البيانات والإعدادات ---
-        const blobShapes = [
-            "60% 40% 30% 70% / 60% 30% 70% 40%",
-            "30% 70% 70% 30% / 30% 30% 70% 70%",
-            "50% 50% 20% 80% / 25% 80% 20% 75%",
-            "70% 30% 30% 70% / 60% 40% 60% 40%",
-            "40% 60% 70% 30% / 40% 50% 60% 50%"
-        ];
+document.getElementById("zoomIn").addEventListener("click", ()=>{
+  scale += 0.1; if(scale>2) scale=2;
+  applyTransform();
+});
+document.getElementById("zoomOut").addEventListener("click", ()=>{
+  scale -= 0.1; if(scale<0.3) scale=0.3;
+  applyTransform();
+});
 
-        let categories = JSON.parse(localStorage.getItem('myBlobCategories')) || [
-            { id: 'personal', name: 'شخصي', color: 'bg-[#ffcfd2] text-[#5c3a3c]' },
-            { id: 'work', name: 'شغل', color: 'bg-[#daeaf6] text-[#3b4d61]' },
-            { id: 'ideas', name: 'أفكار', color: 'bg-[#fff4bd] text-[#6b5d3a]' },
-            { id: 'urgent', name: 'مهم', color: 'bg-[#e2f0cb] text-[#4a5e3a]' },
-            { id: 'script', name: 'سكربت', color: 'bg-[#e0e7ff] text-[#3730a3]' },
-        ];
+window.addEventListener("wheel",(e)=>{
+  const delta=e.deltaY>0?-0.05:+0.05;
+  scale+=delta;
+  if(scale<0.3) scale=0.3;
+  if(scale>2) scale=2;
+  applyTransform();
+},{passive:true});
+</script>
 
-        let notes = JSON.parse(localStorage.getItem('myBlobNotes')) || [];
-        let currentFilter = 'all';
-        let newNoteCat = 'ideas'; // Default category
-
-        // --- عناصر DOM ---
-        const notesContainer = document.getElementById('notesContainer');
-        const sidebar = document.getElementById('sidebar');
-        const sidebarFilters = document.getElementById('sidebarFilters');
-        const addModal = document.getElementById('addModal');
-        const noteInput = document.getElementById('noteInput');
-        const categorySelector = document.getElementById('categorySelector');
-        
-        // --- التهيئة الأولية ---
-        function init() {
-            renderCategories();
-            renderCategorySelector();
-            renderNotes();
-            lucide.createIcons();
-        }
-
-        function saveNotes() {
-            localStorage.setItem('myBlobNotes', JSON.stringify(notes));
-        }
-
-        // --- إدارة القائمة الجانبية (Filter) ---
-        function renderCategories() {
-            sidebarFilters.innerHTML = '';
-            
-            // زر الكل
-            const allBtn = document.createElement('button');
-            allBtn.className = `w-full text-right p-3 rounded-xl transition-all ${currentFilter === 'all' ? 'bg-gray-800 text-white' : 'hover:bg-gray-100'}`;
-            allBtn.textContent = 'الكل';
-            allBtn.onclick = () => { setFilter('all'); toggleMenu(false); };
-            sidebarFilters.appendChild(allBtn);
-
-            categories.forEach(cat => {
-                const btn = document.createElement('button');
-                btn.className = `w-full flex items-center justify-between p-3 rounded-xl transition-all ${currentFilter === cat.id ? 'ring-2 ring-gray-400 font-bold' : 'hover:bg-white/50'}`;
-                
-                // استخراج لون الخلفية للداائرة الصغيرة
-                const bgColorClass = cat.color.split(' ')[0];
-                
-                btn.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <span class="w-4 h-4 rounded-full ${bgColorClass} border border-black/10"></span>
-                        <span>${cat.name}</span>
-                    </div>
-                `;
-                btn.onclick = () => { setFilter(cat.id); toggleMenu(false); };
-                sidebarFilters.appendChild(btn);
-            });
-        }
-
-        function setFilter(id) {
-            currentFilter = id;
-            renderCategories(); // لإعادة تلوين الزر النشط
-            renderNotes();
-        }
-
-        function toggleMenu(show) {
-            if (show) {
-                sidebar.classList.remove('translate-x-full');
-                sidebar.classList.add('translate-x-0');
-            } else {
-                sidebar.classList.add('translate-x-full');
-                sidebar.classList.remove('translate-x-0');
-            }
-        }
-
-        document.getElementById('menuBtn').onclick = () => toggleMenu(true);
-        document.getElementById('closeMenuBtn').onclick = () => toggleMenu(false);
-
-        // --- إدارة النافذة المنبثقة (Modal) ---
-        function renderCategorySelector() {
-            categorySelector.innerHTML = '';
-            categories.forEach(cat => {
-                const btn = document.createElement('button');
-                const isSelected = newNoteCat === cat.id;
-                
-                let classes = "px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex items-center gap-2 ";
-                if (isSelected) {
-                    classes += `${cat.color} ring-2 ring-gray-200 shadow-sm transform scale-105`;
-                } else {
-                    classes += "bg-gray-50 text-gray-400 hover:bg-gray-100";
-                }
-
-                btn.className = classes;
-                btn.innerHTML = `${isSelected ? '<i data-lucide="check" class="w-3.5 h-3.5"></i>' : ''} ${cat.name}`;
-                
-                btn.onclick = () => {
-                    newNoteCat = cat.id;
-                    renderCategorySelector();
-                    lucide.createIcons();
-                };
-                categorySelector.appendChild(btn);
-            });
-        }
-
-        function toggleModal(show) {
-            if (show) {
-                addModal.classList.remove('hidden');
-                noteInput.value = '';
-                newNoteCat = 'ideas';
-                renderCategorySelector();
-                setTimeout(() => noteInput.focus(), 100);
-            } else {
-                addModal.classList.add('hidden');
-            }
-            lucide.createIcons();
-        }
-
-        document.getElementById('addNoteMainBtn').onclick = () => toggleModal(true);
-        document.getElementById('closeModalBtn').onclick = () => toggleModal(false);
-        
-        // --- إضافة ملاحظة ---
-        document.getElementById('saveNoteBtn').onclick = () => {
-            const content = noteInput.value.trim();
-            if (!content) return;
-
-            const randomShape = blobShapes[Math.floor(Math.random() * blobShapes.length)];
-            const randomRotation = Math.floor(Math.random() * 6) - 3;
-            
-            // حساب الموقع العشوائي الدائري
-            const minRadius = 220;
-            const maxRadius = 350;
-            const radius = minRadius + Math.random() * (maxRadius - minRadius);
-            const angle = Math.random() * 2 * Math.PI;
-            
-            const initialX = Math.cos(angle) * radius;
-            const initialY = Math.sin(angle) * radius;
-
-            const newNote = {
-                id: Date.now(),
-                content: content,
-                categoryId: newNoteCat,
-                shape: randomShape,
-                rotation: randomRotation,
-                x: initialX,
-                y: initialY,
-                date: new Date().toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' })
-            };
-
-            notes.unshift(newNote); // إضافة في البداية
-            saveNotes();
-            renderNotes();
-            toggleModal(false);
-        };
-
-        // --- رسم الملاحظات وحذفها ---
-        function getCategoryColor(id) {
-            const cat = categories.find(c => c.id === id);
-            return cat ? cat.color : 'bg-gray-100 text-gray-800';
-        }
-
-        function deleteNote(id) {
-            if(confirm('حذف هذه الفكرة؟')) {
-                notes = notes.filter(n => n.id !== id);
-                saveNotes();
-                renderNotes();
-            }
-        }
-
-        function renderNotes() {
-            notesContainer.innerHTML = '';
-            
-            const filtered = currentFilter === 'all' ? notes : notes.filter(n => n.categoryId === currentFilter);
-
-            filtered.forEach(note => {
-                const noteEl = document.createElement('div');
-                
-                // توافقية للإحداثيات القديمة
-                const noteX = note.x !== undefined ? note.x : (Math.random() * 400 - 200);
-                const noteY = note.y !== undefined ? note.y : (Math.random() * 400 - 200);
-                const colors = getCategoryColor(note.categoryId);
-
-                noteEl.className = `absolute group flex flex-col items-center justify-center text-center shadow-sm hover:shadow-2xl transition-shadow cursor-move select-none ${colors}`;
-                
-                // تطبيق الستايل المباشر
-                noteEl.style.width = '240px';
-                noteEl.style.height = '240px';
-                noteEl.style.borderRadius = note.shape;
-                noteEl.style.transform = `translate(${noteX}px, ${noteY}px) rotate(${note.rotation}deg)`;
-                noteEl.style.marginTop = '-120px'; // لتوسيط العنصر بالنسبة لنقطة الارتكاز
-                noteEl.style.marginLeft = '-120px';
-                noteEl.style.zIndex = '10';
-
-                // محتوى HTML للملاحظة
-                noteEl.innerHTML = `
-                    <button class="delete-btn absolute -top-4 -left-4 bg-white text-red-500 p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 hover:bg-red-50" title="حذف">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    </button>
-                    
-                    <div class="absolute top-2 opacity-0 group-hover:opacity-30 pointer-events-none">
-                        <i data-lucide="move" class="w-4 h-4"></i>
-                    </div>
-
-                    <div class="w-full h-full p-8 flex flex-col items-center justify-center overflow-hidden pointer-events-none">
-                        <p class="font-bold text-lg leading-relaxed whitespace-pre-wrap line-clamp-[7]">${note.content}</p>
-                        <span class="text-[10px] mt-3 opacity-60 font-mono tracking-tighter absolute bottom-6">${note.date}</span>
-                    </div>
-                `;
-
-                // حدث الحذف
-                const delBtn = noteEl.querySelector('.delete-btn');
-                delBtn.addEventListener('mousedown', (e) => {
-                    e.stopPropagation(); // منع السحب عند الضغط على زر الحذف
-                    deleteNote(note.id);
-                });
-
-                // تفعيل السحب
-                noteEl.addEventListener('mousedown', (e) => handleDragStart(e, note, noteEl));
-
-                notesContainer.appendChild(noteEl);
-            });
-            
-            // إعادة تفعيل الأيقونات للعناصر الجديدة
-            lucide.createIcons();
-        }
-
-        // --- منطق السحب (Drag Logic) ---
-        let isDragging = false;
-        let draggedNote = null;
-        let draggedEl = null;
-        let dragOffset = { x: 0, y: 0 };
-
-        function handleDragStart(e, note, element) {
-            // تجاهل السحب إذا تم الضغط على زر الحذف
-            if (e.target.closest('.delete-btn')) return;
-
-            e.preventDefault();
-            e.stopPropagation();
-            
-            isDragging = true;
-            draggedNote = note;
-            draggedEl = element;
-            
-            // رفع الـ Z-Index للعنصر المسحوب
-            element.style.zIndex = 100;
-
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
-
-            // حساب الإزاحة الحالية
-            // ملاحظة: note.x و note.y هما الإحداثيات النسبية للمركز
-            dragOffset = {
-                x: e.clientX - (centerX + note.x),
-                y: e.clientY - (centerY + note.y)
-            };
-
-            // إضافة المستمعين للنافذة
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-        }
-
-        function handleMouseMove(e) {
-            if (!isDragging || !draggedNote) return;
-
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
-
-            const newX = e.clientX - centerX - dragOffset.x;
-            const newY = e.clientY - centerY - dragOffset.y;
-
-            // تحديث موقع العنصر في DOM مباشرة للأداء العالي
-            draggedEl.style.transform = `translate(${newX}px, ${newY}px) rotate(${draggedNote.rotation}deg)`;
-            
-            // تحديث البيانات مؤقتاً
-            draggedNote.x = newX;
-            draggedNote.y = newY;
-        }
-
-        function handleMouseUp() {
-            if (!isDragging) return;
-            
-            // حفظ الحالة النهائية
-            isDragging = false;
-            if (draggedEl) draggedEl.style.zIndex = 10;
-            
-            // تحديث مصفوفة الملاحظات الرئيسية بالقيم الجديدة
-            const noteIndex = notes.findIndex(n => n.id === draggedNote.id);
-            if (noteIndex !== -1) {
-                notes[noteIndex] = draggedNote;
-                saveNotes();
-            }
-
-            draggedNote = null;
-            draggedEl = null;
-            
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        }
-
-        // بدء التطبيق
-        init();
-
-    </script>
 </body>
 </html>
